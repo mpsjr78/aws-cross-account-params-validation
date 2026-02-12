@@ -25,7 +25,7 @@ MAIL_FROM = os.environ.get("MAIL_FROM", "mpsjr1978@gmail.com")
 MAIL_TO = os.environ.get("MAIL_TO", "mpsjr1978@gmail.com").split(',')
 
 # ========= ENVIRONMENTS WITHOUT REDIS =========
-ENVIRONMENTS_WITHOUT_REDIS = ["SH-REQ-POC", "SH-REQ-APR-WEBDEFAULT", "SRV-ESSILOR-WEB-PRD", "SRV-IMPAR-WEB-PRD"]
+ENVIRONMENTS_WITHOUT_REDIS = ["*-WEB", "*-PRD", "*-QA"]
 
 # ========= DEFAULT EXPECTED VALUES =========
 EXPECTED_DEFAULTS = {
@@ -369,13 +369,9 @@ def generate_csv_content(findings):
 
 def generate_html_body(findings, instance_stats, issue_count):
     def env_css_class(env):
-        if env == "SD-PRD": return "env-SD-PRD"
-        if env == "SD-QA-DEV": return "env-SD-QA-DEV"
+        if env == "PRD": return "env-PRD"
         if env == "DEV": return "env-DEV"
         if env == "QA":  return "env-QA"
-        if env == "PRD": return "env-PRD"
-        if env == "APR":  return "env-APR"
-        if env == "POC": return "env-POC"
         return "env-UNK"
 
     css_style = """
@@ -399,11 +395,7 @@ def generate_html_body(findings, instance_stats, issue_count):
         .env-pill { display: inline-block; padding: 2px 6px; border-radius: 10px; font-size: 11px; font-weight: 600; }
         .env-DEV {background-color: #e3f2fd; color:#0d47a1;}
         .env-QA {background-color: #f3e5f5;color:#4a148c;}
-        .env-PRD {background-color: #ffebee;color:#b71c1c;}
-        .env-APR {background-color: #e8f5e9;color:#1b5e20;}
-        .env-POC {background-color: #fff3e0;color:#e65100;}
-        .env-SD-PRD {background-color: #ede7f6;color:#311b92;}
-        .env-SD-QA-DEV {background-color: #e0f2f1;color:#004d40;}
+        .env-PRD {background-color: #ede7f6;color:#311b92;}
         .env-UNK {background-color: #eceff1;color:#37474f;}
         .param-name { font-family: Consolas, 'Courier New', monospace; font-size: 12px; }
         .value-cell { font-family: Consolas, 'Courier New', monospace; font-size: 12px; }
@@ -432,7 +424,7 @@ def generate_html_body(findings, instance_stats, issue_count):
             
         detail_rows += f"""<tr class="{f.get('StatusClass', '')}"><td>{f['Account']}</td><td>{f['Instance']}</td><td><span class="env-pill {env_class}">{f['Env']}</span></td><td>{f['Context']}</td><td>{f['File']}</td><td class="param-name">{f['Param']}</td><td class="{val_cls}">{val_display}</td></tr>"""
 
-    return f"""<html><head>{css_style}</head><body><div class="container"><div class="header-info"><h2>RelatÃ³rio de Auditoria de Arquivos de ConfiguraÃ§Ã£o Requestia</h2><p><b>Alertas:</b> {issue_count}. Segue planilha detalhada em anexo.</p></div><div class="legend"><span class="lg-warn">Warning</span><span class="lg-error">Error</span><span class="lg-out">Fora PadrÃ£o</span></div><h3>Resumo</h3><table class="summary-table"><thead><tr><th>Conta</th><th>InstÃ¢ncia</th><th>Ambiente</th><th>Warn</th><th>Err</th><th>Out</th><th>Total</th></tr></thead><tbody>{summary_rows}</tbody></table><h3>Detalhes</h3><table><thead><tr><th>Conta</th><th>InstÃ¢ncia</th><th>Amb</th><th>Contexto</th><th>Arquivo</th><th>Param</th><th>Valor</th></tr></thead><tbody>{detail_rows}</tbody></table></div></body></html>"""
+    return f"""<html><head>{css_style}</head><body><div class="container"><div class="header-info"><h2>RelatÃ³rio de Auditoria de Arquivos de ConfiguraÃ§Ã£o application</h2><p><b>Alerts:</b> {issue_count}. Segue planilha detalhada em anexo.</p></div><div class="legend"><span class="lg-warn">Warning</span><span class="lg-error">Error</span><span class="lg-out">Fora PadrÃ£o</span></div><h3>Resumo</h3><table class="summary-table"><thead><tr><th>Conta</th><th>InstÃ¢ncia</th><th>Ambiente</th><th>Warn</th><th>Err</th><th>Out</th><th>Total</th></tr></thead><tbody>{summary_rows}</tbody></table><h3>Detalhes</h3><table><thead><tr><th>Conta</th><th>InstÃ¢ncia</th><th>Amb</th><th>Contexto</th><th>Arquivo</th><th>Param</th><th>Valor</th></tr></thead><tbody>{detail_rows}</tbody></table></div></body></html>"""
 
 # ==============================================================================
 #  EMAIL SEND (WITH ATTACHMMENT)
@@ -449,7 +441,7 @@ def send_email_with_report(subject, html_body, csv_content):
 
     # CSV Attachmment
     attachment = MIMEApplication(csv_content.encode('utf-8'))
-    attachment.add_header('Content-Disposition', 'attachment', filename='Relatorio_Auditoria_Requestia.csv')
+    attachment.add_header('Content-Disposition', 'attachment', filename='Relatorio_Auditoria_application.csv')
     msg.attach(attachment)
 
     try:
@@ -470,8 +462,8 @@ def send_email_with_report(subject, html_body, csv_content):
 def lambda_handler(event, context):
     powershell_script = r'''
     param (
-        [string]$requestiaPath = "C:\inetpub\wwwroot\Requestia",
-        [string]$requestiaAppPath = "C:\Requestia"
+        [string]$applicationPath = "C:\inetpub\wwwroot",
+        [string]$applicationAppPath = "C:\"
     )
     $ErrorActionPreference = 'SilentlyContinue'
     $CheckRedisGlobal = __CHECK_REDIS_BOOL__ 
@@ -525,8 +517,8 @@ def lambda_handler(event, context):
                 }
             }
 
-            if ($xml.configuration.automidia.security) { 
-                $rootSecurity = $xml.configuration.automidia.security
+            if ($xml.configuration.application.security) { 
+                $rootSecurity = $xml.configuration.application.security
             }
 
             if ($checkAPP) {
@@ -576,7 +568,7 @@ def lambda_handler(event, context):
             
             # --- Validations API/QP/DH ---
             if ($checkAPI) {
-                $auth = $xml.configuration.automidia.'authorization.settings'
+                $auth = $xml.configuration.applcation.'authorization.settings'
                 if ($auth -and $auth.tokens) {
                     $result["httpRuntime.targetFramework"] = $rootSysWeb.httpRuntime.targetFramework
                     $result["tokens.enablePrivateTokens"] = $auth.tokens.enablePrivateTokens
@@ -584,7 +576,7 @@ def lambda_handler(event, context):
                 } else { $result["tokens"] = "Not Found" }
             }
             if ($checkQP) {
-                $qpSecurity = $xml.configuration.automidia.'queryprocessor.security'
+                $qpSecurity = $xml.configuration.application.'queryprocessor.security'
                 if ($qpSecurity -and $qpSecurity.tenantIsolation) {
                     $result["httpRuntime.targetFramework"] = $rootSysWeb.httpRuntime.targetFramework
                     $tenant = $qpSecurity.tenantIsolation
@@ -599,8 +591,8 @@ def lambda_handler(event, context):
             }
             if ($checkDH) {
                 # Safe navigation. Sometimes the XML is Case-Sensitive to the .NET objects
-                # Structure: <configuration> -> <requestia> -> <dataHub>
-                $reqSection = $xml.configuration.requestia
+                # Structure: <configuration> -> <application> -> <dataHub>
+                $reqSection = $xml.configuration.application
                 
                 if ($reqSection -and $reqSection.dataHub) {
                     $datahub = $reqSection.dataHub
@@ -639,11 +631,11 @@ def lambda_handler(event, context):
                 $result["log.enabled"] = $xml.configuration.eventservice.'log'.enabled
                 $result["log.path"] = $xml.configuration.eventservice.'log'.path
             } elseif ($type -eq "Messaging") {
-                $result["debug.enabled"] = $xml.configuration.'requestia.messaging'.'debug'.enabled
+                $result["debug.enabled"] = $xml.configuration.'application.messaging'.'debug'.enabled
             } elseif ($type -eq "Blob") {
-                $result["settings.interval"] = $xml.configuration.automidia.'redirect.settings'.interval
-                $result["settings.filenameMaxSize"] = $xml.configuration.automidia.'redirect.settings'.filenameMaxSize
-                $result["search.bufferSize"] = $xml.configuration.automidia.'redirect.settings'.search.bufferSize
+                $result["settings.interval"] = $xml.configuration.application.'redirect.settings'.interval
+                $result["settings.filenameMaxSize"] = $xml.configuration.application.'redirect.settings'.filenameMaxSize
+                $result["search.bufferSize"] = $xml.configuration.application.'redirect.settings'.search.bufferSize
             }
         } catch { $result["Error"] = "XML Error" }
         return $result
@@ -653,8 +645,8 @@ def lambda_handler(event, context):
         $allResults = @{}
         function Get-OrCreateClientEntry ($name) { if (-not $allResults.ContainsKey($name)) { $allResults[$name] = @{} } }
 
-        if (Test-Path $requestiaPath) {
-            $webFolders = Get-ChildItem -Path $requestiaPath -Directory
+        if (Test-Path $applicationPath) {
+            $webFolders = Get-ChildItem -Path $applicationPath -Directory
             foreach ($folder in $webFolders) {
                 $customerName = $folder.Name
                 Get-OrCreateClientEntry $customerName
@@ -676,8 +668,8 @@ def lambda_handler(event, context):
             }
         }
 
-        if (Test-Path $requestiaAppPath) {
-            $appFolders = Get-ChildItem -Path $requestiaAppPath -Directory
+        if (Test-Path $applicationAppPath) {
+            $appFolders = Get-ChildItem -Path $applicationAppPath -Directory
             foreach ($folder in $appFolders) {
                 $customerName = $folder.Name
                 Get-OrCreateClientEntry $customerName
@@ -715,7 +707,7 @@ def lambda_handler(event, context):
         return {"Error": "Empty script"}
 
     # List with Tag Names (substrings) that must be scanned
-    tag_substrings = ["SH-REQ-POC","QA-WEB", "PRD-WEB"]
+    tag_substrings = ["*-PRD","*-QA", "*-WEB"]
     current_account_id = sts_client.get_caller_identity()["Account"]
     
     all_results = []
