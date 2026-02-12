@@ -1,1 +1,1 @@
-
+Python script automates AWS config audit across multiple accounts, executing PowerShell to check settings and email results with HTML/CSV reports, aiming to validate Redis settings and other default values.
